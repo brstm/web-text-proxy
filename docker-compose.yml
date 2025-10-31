@@ -7,7 +7,6 @@ services:
       - "3000:3000"
     environment:
       - PORT
-      - ALLOW_LOCAL_LAUNCH
       - USER_AGENT
       - ACCEPT_LANGUAGE
       - TIMEZONE
@@ -29,7 +28,6 @@ services:
       - "3000:3000"
     environment:
       - PORT
-      - ALLOW_LOCAL_LAUNCH=false
       - USER_AGENT
       - ACCEPT_LANGUAGE
       - TIMEZONE
