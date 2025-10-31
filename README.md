@@ -36,4 +36,3 @@ docker compose up -d --build reader
 - The service uses `puppeteer-extra` with the stealth plugin to reduce bot detection.
 - Output comes straight from Mozilla Readability; some sites may omit sidebars or interactive sections.
 - Handle the browser gracefully with `docker compose down` when you're done to free resources.
-- Internal runbooks stay local: copy `docs/AGENTS.template.md` to `AGENTS.md` and populate an `agents/` folder (both ignored by git) so session context is available next time without leaking into the repo.
