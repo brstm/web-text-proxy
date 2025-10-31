@@ -34,7 +34,7 @@ function summarizeError(error) {
   return { name, message, truncated, stack: error instanceof Error ? error.stack : undefined };
 }
 
-function recordError(error, context) {
+function recordError(error, context = {}) {
   const summary = summarizeError(error);
   if (VERBOSE_LOG) {
     console.error('Extraction failed:', {
@@ -48,6 +48,15 @@ function recordError(error, context) {
   }
 
   return summary.truncated;
+}
+
+async function withHandledErrors(context, handler) {
+  try {
+    return await handler();
+  } catch (error) {
+    const message = recordError(error, context);
+    throw Object.assign(new Error(message), { originalError: error });
+  }
 }
 
 async function getBrowser() {
@@ -153,55 +162,60 @@ app.get('*', async (req, res) => {
 
   let page;
   let browser;
-  try {
-    browser = await getBrowser();
-    page = await browser.newPage();
-    // Align basic browser fingerprints with a regular desktop user.
-    await page.setUserAgent(USER_AGENT);
-    await page.setViewport(VIEWPORT);
-    await page.setExtraHTTPHeaders({ 'Accept-Language': ACCEPT_LANGUAGE });
+  await withHandledErrors({ target }, async () => {
     try {
-      await page.emulateTimezone(TIMEZONE);
-    } catch (timezoneError) {
-      console.warn(`Failed to set timezone to ${TIMEZONE}:`, timezoneError.message);
-    }
-    await page.evaluateOnNewDocument(() => {
-      Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
-      Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
-    });
-    await page.goto(target, { waitUntil: 'networkidle2', timeout: 45_000 });
-    const html = await page.content();
-    await page.close();
-
-    const dom = new JSDOM(html, { url: target });
-    const reader = new Readability(dom.window.document);
-    const article = reader.parse();
-
-    if (!article || !article.textContent || !article.textContent.trim()) {
-      return res.status(422).json({ error: 'Could not extract article content' });
-    }
-
-    res.type('text/plain').send(article.textContent.trim());
-    if (USING_BROWSERLESS) {
-      await browser.disconnect();
-    }
-  } catch (error) {
-    if (page && !page.isClosed()) {
-      await page.close();
-    }
-    const message = recordError(error, { target });
-    if (USING_BROWSERLESS && browser) {
+      browser = await getBrowser();
+      page = await browser.newPage();
+      // Align basic browser fingerprints with a regular desktop user.
+      await page.setUserAgent(USER_AGENT);
+      await page.setViewport(VIEWPORT);
+      await page.setExtraHTTPHeaders({ 'Accept-Language': ACCEPT_LANGUAGE });
       try {
+        await page.emulateTimezone(TIMEZONE);
+      } catch (timezoneError) {
+        console.warn(`Failed to set timezone to ${TIMEZONE}:`, timezoneError.message);
+      }
+      await page.evaluateOnNewDocument(() => {
+        Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+        Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
+      });
+      await page.goto(target, { waitUntil: 'networkidle2', timeout: 45_000 });
+      const html = await page.content();
+      const dom = new JSDOM(html, { url: target });
+      const reader = new Readability(dom.window.document);
+      const article = reader.parse();
+
+      if (!article || !article.textContent || !article.textContent.trim()) {
+        res.status(422).json({ error: 'Could not extract article content' });
+        return;
+      }
+
+      res.type('text/plain').send(article.textContent.trim());
+      if (USING_BROWSERLESS) {
         await browser.disconnect();
-      } catch {
-        // ignore disconnect failures
+      }
+    } finally {
+      if (page && !page.isClosed()) {
+        await page.close();
+      }
+      if (USING_BROWSERLESS && browser) {
+        try {
+          await browser.disconnect();
+        } catch {
+          // ignore disconnect failures
+        }
+      }
+      if (!USING_BROWSERLESS && browser && !browser.isConnected()) {
+        browserPromise = undefined;
       }
     }
-    if (!USING_BROWSERLESS && browser && !browser.isConnected()) {
-      browserPromise = undefined;
-    }
-    res.status(500).json({ error: 'Extraction failed', detail: message });
-  }
+  })
+    .then(() => {
+      res.type('text/plain');
+    })
+    .catch((error) => {
+      res.status(500).json({ error: 'Extraction failed', detail: error.message });
+    });
 });
 
 async function shutdown() {
