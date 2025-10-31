@@ -1,0 +1,21 @@
+{
+  "name": "Web Text Proxy",
+  "build": {
+	"dockerfile": "Dockerfile"
+  },
+  "remoteUser": "node",
+  "mounts": [
+	"source=/home/bsm/.codex,target=/home/node/.codex,type=bind"
+  ],
+  "features": {
+    "ghcr.io/schlich/devcontainer-features/playwright:0": {},
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "OpenAI.codex"
+      ]
+    }
+  }
+}
