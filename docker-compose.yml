@@ -5,19 +5,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    environment:
-      - PORT
-      - USER_AGENT
-      - ACCEPT_LANGUAGE
-      - TIMEZONE
-      - VIEWPORT_WIDTH
-      - VIEWPORT_HEIGHT
-      - DEVICE_SCALE_FACTOR
-      - HEADLESS
-      - CHROME_EXECUTABLE_PATH
-      - USER_DATA_DIR
-      - BROWSERLESS_WS_ENDPOINT
-      - BROWSERLESS_URL
 
   web-text-proxy-browserless:
     profiles: ["browserless"]
@@ -27,15 +14,5 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - PORT
-      - USER_AGENT
-      - ACCEPT_LANGUAGE
-      - TIMEZONE
-      - VIEWPORT_WIDTH
-      - VIEWPORT_HEIGHT
-      - DEVICE_SCALE_FACTOR
-      - HEADLESS
-      - CHROME_EXECUTABLE_PATH
-      - USER_DATA_DIR
       - BROWSERLESS_WS_ENDPOINT
       - BROWSERLESS_URL
