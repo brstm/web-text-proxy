@@ -25,6 +25,12 @@ Set one of the Browserless endpoints before starting:
 
 When either is present the service connects remotely; local launch stays disabled in that profile.
 
+Example:
+
+```sh
+BROWSERLESS_WS_ENDPOINT=ws://10.10.10.10:4000 docker compose --profile browserless up -d web-text-proxy-browserless
+```
+
 ## Environment Variables
 
 | Variable | Default | Description |

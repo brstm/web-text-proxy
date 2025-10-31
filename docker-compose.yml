@@ -6,19 +6,19 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - PORT=3000
-      - BROWSERLESS_WS_ENDPOINT=
-      - BROWSERLESS_URL=
-      - ALLOW_LOCAL_LAUNCH=true
-      - USER_AGENT=
-      - ACCEPT_LANGUAGE=
-      - TIMEZONE=
-      - VIEWPORT_WIDTH=
-      - VIEWPORT_HEIGHT=
-      - DEVICE_SCALE_FACTOR=
-      - HEADLESS=
-      - CHROME_EXECUTABLE_PATH=
-      - USER_DATA_DIR=
+      - PORT
+      - ALLOW_LOCAL_LAUNCH
+      - USER_AGENT
+      - ACCEPT_LANGUAGE
+      - TIMEZONE
+      - VIEWPORT_WIDTH
+      - VIEWPORT_HEIGHT
+      - DEVICE_SCALE_FACTOR
+      - HEADLESS
+      - CHROME_EXECUTABLE_PATH
+      - USER_DATA_DIR
+      - BROWSERLESS_WS_ENDPOINT
+      - BROWSERLESS_URL
 
   web-text-proxy-browserless:
     profiles: ["browserless"]
@@ -28,16 +28,16 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - PORT=3000
-      - BROWSERLESS_WS_ENDPOINT=
-      - BROWSERLESS_URL=
+      - PORT
       - ALLOW_LOCAL_LAUNCH=false
-      - USER_AGENT=
-      - ACCEPT_LANGUAGE=
-      - TIMEZONE=
-      - VIEWPORT_WIDTH=
-      - VIEWPORT_HEIGHT=
-      - DEVICE_SCALE_FACTOR=
-      - HEADLESS=
-      - CHROME_EXECUTABLE_PATH=
-      - USER_DATA_DIR=
+      - USER_AGENT
+      - ACCEPT_LANGUAGE
+      - TIMEZONE
+      - VIEWPORT_WIDTH
+      - VIEWPORT_HEIGHT
+      - DEVICE_SCALE_FACTOR
+      - HEADLESS
+      - CHROME_EXECUTABLE_PATH
+      - USER_DATA_DIR
+      - BROWSERLESS_WS_ENDPOINT
+      - BROWSERLESS_URL
