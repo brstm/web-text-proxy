@@ -31,6 +31,8 @@ Example:
 BROWSERLESS_WS_ENDPOINT=ws://10.10.10.10:4000 docker compose --profile browserless up -d web-text-proxy-browserless
 ```
 
+> The Browserless profile ships without Chromium; if you omit the endpoint the service will fail fast instead of attempting a local launch.
+
 ## Environment Variables
 
 | Variable | Default | Description |
@@ -38,7 +40,6 @@ BROWSERLESS_WS_ENDPOINT=ws://10.10.10.10:4000 docker compose --profile browserle
 | `PORT` | `3000` | Internal HTTP port the Express app listens on. Exposed externally via Compose (`3000:3000`). |
 | `BROWSERLESS_WS_ENDPOINT` | _(empty)_ | WebSocket endpoint for Browserless (e.g. `wss://browserless.example.com?token=...`). |
 | `BROWSERLESS_URL` | _(empty)_ | HTTP DevTools endpoint alternative (e.g. `https://browserless.example.com?token=...`). |
-| `ALLOW_LOCAL_LAUNCH` | `true` (local) / `false` (browserless profile) | Permit local Chromium launch when no Browserless endpoint is provided.
 | `USER_AGENT` | desktop Chrome UA | Override reported user-agent string. |
 | `ACCEPT_LANGUAGE` | `en-US,en;q=0.9` | Override `Accept-Language` header. |
 | `TIMEZONE` | `America/Los_Angeles` | Timezone passed to `page.emulateTimezone`. |
