@@ -1,5 +1,4 @@
 const express = require('express');
-const { promises: fs } = require('fs');
 const puppeteer = require('puppeteer-extra');
 const { Readability } = require('@mozilla/readability');
 const { JSDOM } = require('jsdom');
@@ -13,7 +12,6 @@ const BROWSERLESS_URL = process.env.BROWSERLESS_URL && process.env.BROWSERLESS_U
 const USING_BROWSERLESS = Boolean(BROWSERLESS_WS_ENDPOINT || BROWSERLESS_URL);
 const SKIP_CHROMIUM_DOWNLOAD = process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD === 'true';
 const VERBOSE_LOG = process.env.VERBOSE_LOG === 'true';
-const ERROR_LOG_PATH = process.env.ERROR_LOG_PATH && process.env.ERROR_LOG_PATH.trim();
 const LOG_MESSAGE_LIMIT = Number(process.env.LOG_MESSAGE_LIMIT || 400);
 const USER_AGENT =
   process.env.USER_AGENT ||
@@ -39,22 +37,14 @@ function summarizeError(error) {
 function recordError(error, context) {
   const summary = summarizeError(error);
   if (VERBOSE_LOG) {
-    console.error('Extraction failed:', { ...context, name: summary.name, message: summary.message, stack: summary.stack });
-  } else {
-    console.error(`Extraction failed: ${summary.name}: ${summary.truncated}`);
-  }
-
-  if (ERROR_LOG_PATH) {
-    const payload = {
-      timestamp: new Date().toISOString(),
+    console.error('Extraction failed:', {
       ...context,
       name: summary.name,
       message: summary.message,
       stack: summary.stack
-    };
-    fs.appendFile(ERROR_LOG_PATH, `${JSON.stringify(payload)}\n`).catch((writeError) => {
-      console.error('Failed to write error log:', writeError.message);
     });
+  } else {
+    console.error(`Extraction failed: ${summary.name}: ${summary.truncated}`);
   }
 
   return summary.truncated;
