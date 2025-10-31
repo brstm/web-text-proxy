@@ -157,7 +157,8 @@ app.get('*', async (req, res) => {
   // Everything except the root path proxies through Puppeteer + Readability.
   const target = resolveTargetUrl(req);
   if (!target) {
-    return res.status(400).json({ error: 'Visit /https://example.com/article' });
+    res.status(400).json({ error: 'Visit /https://example.com/article' });
+    return;
   }
 
   let page;
@@ -209,13 +210,9 @@ app.get('*', async (req, res) => {
         browserPromise = undefined;
       }
     }
-  })
-    .then(() => {
-      res.type('text/plain');
-    })
-    .catch((error) => {
-      res.status(500).json({ error: 'Extraction failed', detail: error.message });
-    });
+  }).catch((error) => {
+    res.status(500).json({ error: 'Extraction failed', detail: error.message });
+  });
 });
 
 async function shutdown() {
