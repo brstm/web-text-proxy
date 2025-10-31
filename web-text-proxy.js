@@ -86,10 +86,26 @@ function resolveTargetUrl(req) {
   } catch (decodeError) {
     console.warn(`Failed to decode target URL "${raw}":`, decodeError.message);
   }
-  if (!/^https?:\/\//i.test(raw)) {
+  if (!raw) {
     return undefined;
   }
-  return raw;
+
+  let candidate = raw;
+  if (!/^https?:\/\//i.test(candidate)) {
+    candidate = `https://${candidate}`;
+  }
+
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      // Preserve original scheme case if supplied, otherwise use normalized href.
+      return /^https?:\/\//i.test(raw) ? raw : parsed.href;
+    }
+  } catch (error) {
+    console.warn(`Failed to parse target URL "${candidate}":`, error.message);
+  }
+
+  return undefined;
 }
 
 app.get('*', async (req, res) => {
