@@ -1,6 +1,6 @@
 # Web Text Proxy
 
-Fetch readable article text from any URL by prepending this service's host.
+Fetch readable article text from any URL by prepending this service's host. I built it so I can wrap links that AI chat bots refuse to crawl—prepend the proxy, hand the new URL to the bot, and it reads the page text without manual copy/paste.
 
 ## Quick Start
 
