@@ -25,49 +25,55 @@ const VIEWPORT = {
 let browserPromise;
 
 async function getBrowser() {
-  if (!browserPromise) {
-    if (USING_BROWSERLESS) {
-      const connectOptions = {
-        defaultViewport: null,
-        ignoreHTTPSErrors: true
-      };
+  if (USING_BROWSERLESS) {
+    const connectOptions = {
+      defaultViewport: null,
+      ignoreHTTPSErrors: true
+    };
 
-      if (BROWSERLESS_WS_ENDPOINT) {
-        connectOptions.browserWSEndpoint = BROWSERLESS_WS_ENDPOINT;
-      } else {
-        connectOptions.browserURL = BROWSERLESS_URL;
-      }
-
-      browserPromise = puppeteer.connect(connectOptions);
+    if (BROWSERLESS_WS_ENDPOINT) {
+      connectOptions.browserWSEndpoint = BROWSERLESS_WS_ENDPOINT;
     } else {
-      if (SKIP_CHROMIUM_DOWNLOAD) {
-        throw new Error(
-          'Chromium is not bundled in this image. Configure BROWSERLESS_WS_ENDPOINT/BROWSERLESS_URL or rebuild with a Chromium-enabled image.'
-        );
-      }
-      const launchOptions = {
-        headless: process.env.HEADLESS === 'false' ? false : 'new',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-blink-features=AutomationControlled'
-        ],
-        defaultViewport: null
-      };
-
-      if (process.env.CHROME_EXECUTABLE_PATH) {
-        launchOptions.executablePath = process.env.CHROME_EXECUTABLE_PATH;
-      }
-
-      if (process.env.USER_DATA_DIR) {
-        launchOptions.userDataDir = process.env.USER_DATA_DIR;
-      }
-
-      browserPromise = puppeteer.launch(launchOptions);
+      connectOptions.browserURL = BROWSERLESS_URL;
     }
+
+    return puppeteer.connect(connectOptions);
   }
-  return browserPromise;
+
+  if (!browserPromise) {
+    if (SKIP_CHROMIUM_DOWNLOAD) {
+      throw new Error(
+        'Chromium is not bundled in this image. Configure BROWSERLESS_WS_ENDPOINT/BROWSERLESS_URL or rebuild with a Chromium-enabled image.'
+      );
+    }
+    const launchOptions = {
+      headless: process.env.HEADLESS === 'false' ? false : 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-blink-features=AutomationControlled'
+      ],
+      defaultViewport: null
+    };
+
+    if (process.env.CHROME_EXECUTABLE_PATH) {
+      launchOptions.executablePath = process.env.CHROME_EXECUTABLE_PATH;
+    }
+
+    if (process.env.USER_DATA_DIR) {
+      launchOptions.userDataDir = process.env.USER_DATA_DIR;
+    }
+
+    browserPromise = puppeteer.launch(launchOptions);
+  }
+
+  const browser = await browserPromise;
+  if (!browser.isConnected()) {
+    browserPromise = undefined;
+    return getBrowser();
+  }
+  return browser;
 }
 
 const app = express();
@@ -116,8 +122,9 @@ app.get('*', async (req, res) => {
   }
 
   let page;
+  let browser;
   try {
-    const browser = await getBrowser();
+    browser = await getBrowser();
     page = await browser.newPage();
     // Align basic browser fingerprints with a regular desktop user.
     await page.setUserAgent(USER_AGENT);
@@ -145,12 +152,29 @@ app.get('*', async (req, res) => {
     }
 
     res.type('text/plain').send(article.textContent.trim());
+    if (USING_BROWSERLESS) {
+      await browser.disconnect();
+    }
   } catch (error) {
     if (page && !page.isClosed()) {
       await page.close();
     }
-    console.error('Extraction failed', error);
-    res.status(500).json({ error: 'Extraction failed', detail: error.message });
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Extraction failed:', {
+      name: error instanceof Error ? error.name : typeof error,
+      message
+    });
+    if (USING_BROWSERLESS && browser) {
+      try {
+        await browser.disconnect();
+      } catch {
+        // ignore disconnect failures
+      }
+    }
+    if (!USING_BROWSERLESS && browser && !browser.isConnected()) {
+      browserPromise = undefined;
+    }
+    res.status(500).json({ error: 'Extraction failed', detail: message });
   }
 });
 
