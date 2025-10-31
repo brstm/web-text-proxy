@@ -172,8 +172,10 @@ app.get('*', async (req, res) => {
     await page.goto(target, { waitUntil: 'networkidle2', timeout: 45_000 });
     const html = await page.content();
     const virtualConsole = new VirtualConsole();
-    virtualConsole.on('error', (err) => logError(err, { stage: 'jsdom-error', target }));
-    virtualConsole.on('warn', (err) => logError(err, { stage: 'jsdom-warn', target }));
+    const jsdomLogContext = (stage) => ({ stage, target });
+    virtualConsole.on('error', (err) => logError(err, jsdomLogContext('jsdom-error')));
+    virtualConsole.on('warn', (err) => logError(err, jsdomLogContext('jsdom-warn')));
+    virtualConsole.on('jsdomError', (err) => logError(err, jsdomLogContext('jsdom-error')));
     const dom = new JSDOM(html, { url: target, virtualConsole });
     const reader = new Readability(dom.window.document);
     const article = reader.parse();
