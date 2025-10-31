@@ -5,28 +5,34 @@ Fetch readable article text from any URL by prepending this service's host. Usef
 ## Quick Start
 
 ```sh
-docker compose up -d --build text
+docker compose up -d --build
 ```
 
-Then visit `http://localhost:3789/https://example.com/article`. The service connects to your Browserless instance, runs Mozilla Readability, and returns plain text.
+Then visit `http://localhost:3000/https://example.com/article`. The default service launches Chromium inside the container, runs Mozilla Readability, and returns plain text.
 
-### Using Browserless
+### Using Browserless Instead
 
-Point the app at an existing Browserless deployment via environment variables:
+An optional lightweight profile reuses a remote Browserless instance:
+
+```sh
+docker compose --profile browserless up -d --build web-text-proxy-browserless
+```
+
+Set one of the Browserless endpoints before starting:
 
 - `BROWSERLESS_WS_ENDPOINT` – WebSocket endpoint (`ws://` or `wss://`).
 - `BROWSERLESS_URL` – HTTP DevTools endpoint (`http://` or `https://`).
 
-Set one of them (WebSocket preferred). Local Chromium launch is disabled by default; enable it with `ALLOW_LOCAL_LAUNCH=true` only if the container image has all Chrome dependencies.
+When either is present the service connects remotely; local launch stays disabled in that profile.
 
 ## Environment Variables
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `PORT` | `3000` | Internal HTTP port the Express app listens on. Exposed externally via Compose (`3789:3000`). |
+| `PORT` | `3000` | Internal HTTP port the Express app listens on. Exposed externally via Compose (`3000:3000`). |
 | `BROWSERLESS_WS_ENDPOINT` | _(empty)_ | WebSocket endpoint for Browserless (e.g. `wss://browserless.example.com?token=...`). |
 | `BROWSERLESS_URL` | _(empty)_ | HTTP DevTools endpoint alternative (e.g. `https://browserless.example.com?token=...`). |
-| `ALLOW_LOCAL_LAUNCH` | `false` | Permit local Chromium launch when no Browserless endpoint is provided. Requires Chrome deps.
+| `ALLOW_LOCAL_LAUNCH` | `true` (local) / `false` (browserless profile) | Permit local Chromium launch when no Browserless endpoint is provided.
 | `USER_AGENT` | desktop Chrome UA | Override reported user-agent string. |
 | `ACCEPT_LANGUAGE` | `en-US,en;q=0.9` | Override `Accept-Language` header. |
 | `TIMEZONE` | `America/Los_Angeles` | Timezone passed to `page.emulateTimezone`. |
@@ -44,7 +50,7 @@ Dependencies install during the Docker build. If you need them locally, run `npm
 To rebuild after code changes:
 
 ```sh
-docker compose up -d --build text
+docker compose up -d --build
 ```
 
 ## Notes

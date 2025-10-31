@@ -1,6 +1,8 @@
-FROM ghcr.io/puppeteer/puppeteer:latest
+FROM node:alpine
 
-WORKDIR /app
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+WORKDIR /usr/src/app
 
 COPY package.json ./
 

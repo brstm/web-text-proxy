@@ -9,7 +9,7 @@ puppeteer.use(StealthPlugin());
 const PORT = process.env.PORT || 3000;
 const BROWSERLESS_WS_ENDPOINT = process.env.BROWSERLESS_WS_ENDPOINT && process.env.BROWSERLESS_WS_ENDPOINT.trim();
 const BROWSERLESS_URL = process.env.BROWSERLESS_URL && process.env.BROWSERLESS_URL.trim();
-const ALLOW_LOCAL_LAUNCH = process.env.ALLOW_LOCAL_LAUNCH === 'true';
+const ALLOW_LOCAL_LAUNCH = process.env.ALLOW_LOCAL_LAUNCH !== 'false';
 const USING_BROWSERLESS = Boolean(BROWSERLESS_WS_ENDPOINT || BROWSERLESS_URL);
 const USER_AGENT =
   process.env.USER_AGENT ||
@@ -42,7 +42,7 @@ async function getBrowser() {
     } else {
       if (!ALLOW_LOCAL_LAUNCH) {
         throw new Error(
-          'Browserless endpoint not configured and local Chromium launch disabled. Set BROWSERLESS_WS_ENDPOINT or ALLOW_LOCAL_LAUNCH=true.'
+          'Browserless endpoint not configured and local Chromium launch disabled. Set ALLOW_LOCAL_LAUNCH=true to enable local launch or provide a Browserless endpoint.'
         );
       }
 
