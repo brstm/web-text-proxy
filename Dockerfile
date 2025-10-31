@@ -1,4 +1,6 @@
-FROM ghcr.io/puppeteer/puppeteer:latest
+FROM node:20-slim
+
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 WORKDIR /app
 

@@ -1,8 +1,12 @@
 services:
   reader:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
       - PORT=3000
-    command: npm run start
+      - BROWSERLESS_WS_ENDPOINT=${BROWSERLESS_WS_ENDPOINT:-}
+      - BROWSERLESS_URL=${BROWSERLESS_URL:-}
+      - ALLOW_LOCAL_LAUNCH=${ALLOW_LOCAL_LAUNCH:-false}

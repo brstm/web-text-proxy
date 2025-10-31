@@ -7,6 +7,10 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 
 const PORT = process.env.PORT || 3000;
+const BROWSERLESS_WS_ENDPOINT = process.env.BROWSERLESS_WS_ENDPOINT && process.env.BROWSERLESS_WS_ENDPOINT.trim();
+const BROWSERLESS_URL = process.env.BROWSERLESS_URL && process.env.BROWSERLESS_URL.trim();
+const ALLOW_LOCAL_LAUNCH = process.env.ALLOW_LOCAL_LAUNCH === 'true';
+const USING_BROWSERLESS = Boolean(BROWSERLESS_WS_ENDPOINT || BROWSERLESS_URL);
 const USER_AGENT =
   process.env.USER_AGENT ||
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
@@ -22,26 +26,47 @@ let browserPromise;
 
 async function getBrowser() {
   if (!browserPromise) {
-    const launchOptions = {
-      headless: process.env.HEADLESS === 'false' ? false : 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-blink-features=AutomationControlled'
-      ],
-      defaultViewport: null
-    };
+    if (USING_BROWSERLESS) {
+      const connectOptions = {
+        defaultViewport: null,
+        ignoreHTTPSErrors: true
+      };
 
-    if (process.env.CHROME_EXECUTABLE_PATH) {
-      launchOptions.executablePath = process.env.CHROME_EXECUTABLE_PATH;
+      if (BROWSERLESS_WS_ENDPOINT) {
+        connectOptions.browserWSEndpoint = BROWSERLESS_WS_ENDPOINT;
+      } else {
+        connectOptions.browserURL = BROWSERLESS_URL;
+      }
+
+      browserPromise = puppeteer.connect(connectOptions);
+    } else {
+      if (!ALLOW_LOCAL_LAUNCH) {
+        throw new Error(
+          'Browserless endpoint not configured and local Chromium launch disabled. Set BROWSERLESS_WS_ENDPOINT or ALLOW_LOCAL_LAUNCH=true.'
+        );
+      }
+
+      const launchOptions = {
+        headless: process.env.HEADLESS === 'false' ? false : 'new',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-blink-features=AutomationControlled'
+        ],
+        defaultViewport: null
+      };
+
+      if (process.env.CHROME_EXECUTABLE_PATH) {
+        launchOptions.executablePath = process.env.CHROME_EXECUTABLE_PATH;
+      }
+
+      if (process.env.USER_DATA_DIR) {
+        launchOptions.userDataDir = process.env.USER_DATA_DIR;
+      }
+
+      browserPromise = puppeteer.launch(launchOptions);
     }
-
-    if (process.env.USER_DATA_DIR) {
-      launchOptions.userDataDir = process.env.USER_DATA_DIR;
-    }
-
-    browserPromise = puppeteer.launch(launchOptions);
   }
   return browserPromise;
 }
@@ -116,8 +141,16 @@ app.get('*', async (req, res) => {
 
 async function shutdown() {
   if (browserPromise) {
-    const browser = await browserPromise;
-    await browser.close();
+    try {
+      const browser = await browserPromise;
+      if (USING_BROWSERLESS) {
+        browser.disconnect();
+      } else {
+        await browser.close();
+      }
+    } catch (error) {
+      console.error('Failed to close browser cleanly', error);
+    }
   }
   process.exit(0);
 }
