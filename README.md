@@ -43,6 +43,7 @@ When either is present the service connects remotely; local launch stays disable
 | `HEADLESS` | `'new'` | Set to `false` to open a visible browser (only valid with local launch). |
 | `CHROME_EXECUTABLE_PATH` | _(empty)_ | Custom Chrome binary path (local launch only). |
 | `USER_DATA_DIR` | _(empty)_ | Persistent Chrome profile directory (local launch only). |
+| `VERBOSE_ERRORS` | `false` | When `true`, log full error objects instead of single-line messages. |
 
 ## Development
 

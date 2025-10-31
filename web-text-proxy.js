@@ -11,8 +11,7 @@ const BROWSERLESS_WS_ENDPOINT = process.env.BROWSERLESS_WS_ENDPOINT && process.e
 const BROWSERLESS_URL = process.env.BROWSERLESS_URL && process.env.BROWSERLESS_URL.trim();
 const USING_BROWSERLESS = Boolean(BROWSERLESS_WS_ENDPOINT || BROWSERLESS_URL);
 const SKIP_CHROMIUM_DOWNLOAD = process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD === 'true';
-const VERBOSE_LOG = process.env.VERBOSE_LOG === 'true';
-const LOG_MESSAGE_LIMIT = Number(process.env.LOG_MESSAGE_LIMIT || 400);
+const VERBOSE_ERRORS = process.env.VERBOSE_ERRORS === 'true';
 const USER_AGENT =
   process.env.USER_AGENT ||
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
@@ -26,37 +25,28 @@ const VIEWPORT = {
 
 let browserPromise;
 
-function summarizeError(error) {
-  const name = error instanceof Error ? error.name : typeof error;
-  const message = error instanceof Error ? error.message : String(error);
-  const truncated =
-    message.length > LOG_MESSAGE_LIMIT ? `${message.slice(0, LOG_MESSAGE_LIMIT)}…` : message;
-  return { name, message, truncated, stack: error instanceof Error ? error.stack : undefined };
+function logError(error, context = {}, { log = true } = {}) {
+  const err =
+    error instanceof Error ? error : new Error(typeof error === 'string' ? error : String(error));
+  if (log) {
+    if (VERBOSE_ERRORS) {
+      console.error('Error:', {
+        ...context,
+        name: err.name || typeof err,
+        message: err.message,
+        stack: err.stack
+      });
+    } else {
+      console.error(`Error: ${err.message}`);
+    }
+  }
+  return err.message || String(err);
 }
 
-function recordError(error, context = {}) {
-  const summary = summarizeError(error);
-  if (VERBOSE_LOG) {
-    console.error('Extraction failed:', {
-      ...context,
-      name: summary.name,
-      message: summary.message,
-      stack: summary.stack
-    });
-  } else {
-    console.error(`Extraction failed: ${summary.name}: ${summary.truncated}`);
-  }
-
-  return summary.truncated;
-}
-
-async function withHandledErrors(context, handler) {
-  try {
-    return await handler();
-  } catch (error) {
-    const message = recordError(error, context);
-    throw Object.assign(new Error(message), { originalError: error });
-  }
+function sendError(res, status, err, context = {}, options = {}) {
+  const { label, log = true } = options;
+  const message = logError(err, context, { log });
+  res.status(status).json({ error: label ?? message, detail: message });
 }
 
 async function getBrowser() {
@@ -157,62 +147,63 @@ app.get('*', async (req, res) => {
   // Everything except the root path proxies through Puppeteer + Readability.
   const target = resolveTargetUrl(req);
   if (!target) {
-    res.status(400).json({ error: 'Visit /https://example.com/article' });
+    sendError(res, 400, new Error('Visit /https://example.com/article'), { path: req.originalUrl }, { log: false, label: 'Invalid request' });
     return;
   }
 
   let page;
   let browser;
-  await withHandledErrors({ target }, async () => {
+  try {
+    browser = await getBrowser();
+    page = await browser.newPage();
+    // Align basic browser fingerprints with a regular desktop user.
+    await page.setUserAgent(USER_AGENT);
+    await page.setViewport(VIEWPORT);
+    await page.setExtraHTTPHeaders({ 'Accept-Language': ACCEPT_LANGUAGE });
     try {
-      browser = await getBrowser();
-      page = await browser.newPage();
-      // Align basic browser fingerprints with a regular desktop user.
-      await page.setUserAgent(USER_AGENT);
-      await page.setViewport(VIEWPORT);
-      await page.setExtraHTTPHeaders({ 'Accept-Language': ACCEPT_LANGUAGE });
-      try {
-        await page.emulateTimezone(TIMEZONE);
-      } catch (timezoneError) {
-        console.warn(`Failed to set timezone to ${TIMEZONE}:`, timezoneError.message);
-      }
-      await page.evaluateOnNewDocument(() => {
-        Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
-        Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
-      });
-      await page.goto(target, { waitUntil: 'networkidle2', timeout: 45_000 });
-      const html = await page.content();
-      const dom = new JSDOM(html, { url: target });
-      const reader = new Readability(dom.window.document);
-      const article = reader.parse();
+      await page.emulateTimezone(TIMEZONE);
+    } catch (timezoneError) {
+      console.warn(`Failed to set timezone to ${TIMEZONE}:`, timezoneError.message);
+    }
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+      Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
+    });
+    await page.goto(target, { waitUntil: 'networkidle2', timeout: 45_000 });
+    const html = await page.content();
+    const dom = new JSDOM(html, { url: target });
+    const reader = new Readability(dom.window.document);
+    const article = reader.parse();
 
-      if (!article || !article.textContent || !article.textContent.trim()) {
-        res.status(422).json({ error: 'Could not extract article content' });
-        return;
-      }
+    if (!article || !article.textContent || !article.textContent.trim()) {
+      sendError(res, 422, new Error('Could not extract article content'), { target }, { log: false, label: 'Could not extract article content' });
+      return;
+    }
 
-      res.type('text/plain').send(article.textContent.trim());
+    const body = article.textContent.trim();
+    if (!res.headersSent) {
+      res.type('text/plain').send(body);
+    }
+  } catch (error) {
+    if (!res.headersSent) {
+      sendError(res, 500, error, { target }, { label: 'Extraction failed' });
+    }
+  } finally {
+    if (page && !page.isClosed()) {
+      await page.close().catch((err) =>
+        logError(err, { stage: 'page-close', target }, { log: VERBOSE_ERRORS })
+      );
+    }
+    if (browser) {
       if (USING_BROWSERLESS) {
-        await browser.disconnect();
-      }
-    } finally {
-      if (page && !page.isClosed()) {
-        await page.close();
-      }
-      if (USING_BROWSERLESS && browser) {
-        try {
-          await browser.disconnect();
-        } catch {
-          // ignore disconnect failures
-        }
-      }
-      if (!USING_BROWSERLESS && browser && !browser.isConnected()) {
+        await browser.disconnect().catch((err) =>
+          logError(err, { stage: 'disconnect', target }, { log: VERBOSE_ERRORS })
+        );
+      } else if (!browser.isConnected()) {
         browserPromise = undefined;
       }
     }
-  }).catch((error) => {
-    res.status(500).json({ error: 'Extraction failed', detail: error.message });
-  });
+  }
 });
 
 async function shutdown() {
@@ -225,7 +216,7 @@ async function shutdown() {
         await browser.close();
       }
     } catch (error) {
-      console.error('Failed to close browser cleanly', error);
+      logError(error, { stage: 'shutdown' });
     }
   }
   process.exit(0);
