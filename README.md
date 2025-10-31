@@ -1,36 +1,41 @@
 # Web Text Proxy
 
-Fetch readable article text from any URL by prepending this service's host. Useful for passing URLs that block AI; prepend the proxy, hand the new URL to the AI, and it reads the page text without manual copy/paste.
+Fetch readable article text from any URL by prepending this service's host. Useful when sites block AI or automated crawlers.
 
 ## Quick Start
 
 ```sh
-docker compose up -d --build reader
+docker compose up -d --build text
 ```
 
-Then visit `http://localhost:3000/https://example.com/article`. The service launches Chrome via Puppeteer, runs Mozilla Readability, and returns plain text.
+Then visit `http://localhost:3789/https://example.com/article`. The service connects to your Browserless instance, runs Mozilla Readability, and returns plain text.
 
 ### Using Browserless
 
-Point the app at an existing Browserless instance by setting one of:
+Point the app at an existing Browserless deployment via environment variables:
 
-- `BROWSERLESS_WS_ENDPOINT` – e.g. `wss://browserless.example.com?token=...`
-- `BROWSERLESS_URL` – (HTTP endpoint) e.g. `https://browserless.example.com?token=...`
+- `BROWSERLESS_WS_ENDPOINT` – WebSocket endpoint (`ws://` or `wss://`).
+- `BROWSERLESS_URL` – HTTP DevTools endpoint (`http://` or `https://`).
 
-When either is present the service connects remotely instead of launching Chromium locally. Local launch is disabled by default on this branch; set `ALLOW_LOCAL_LAUNCH=true` if you supply your own Chrome binary.
+Set one of them (WebSocket preferred). Local Chromium launch is disabled by default; enable it with `ALLOW_LOCAL_LAUNCH=true` only if the container image has all Chrome dependencies.
 
-## Configuration
+## Environment Variables
 
-Environment variables on the `reader` service tweak browser behavior:
-
-- `PORT` – HTTP port (default `3000`).
-- `USER_AGENT`, `ACCEPT_LANGUAGE`, `TIMEZONE`, `VIEWPORT_WIDTH`, `VIEWPORT_HEIGHT`, `DEVICE_SCALE_FACTOR` – override fingerprints to match your daily browser.
-- `HEADLESS=false` – run a visible browser (useful for debugging).
-- `CHROME_EXECUTABLE_PATH`, `USER_DATA_DIR` – point at a local Chrome binary and profile.
-- `BROWSERLESS_WS_ENDPOINT` / `BROWSERLESS_URL` – connect to a remote Browserless instance (preferred on ARM).
-- `ALLOW_LOCAL_LAUNCH=true` – fall back to launching Chromium inside the container (requires a compatible base image).
-
-Edit `docker-compose.yml` to set values, or pass them via the CLI when starting the stack.
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PORT` | `3000` | Internal HTTP port the Express app listens on. Exposed externally via Compose (`3789:3000`). |
+| `BROWSERLESS_WS_ENDPOINT` | _(empty)_ | WebSocket endpoint for Browserless (e.g. `wss://browserless.example.com?token=...`). |
+| `BROWSERLESS_URL` | _(empty)_ | HTTP DevTools endpoint alternative (e.g. `https://browserless.example.com?token=...`). |
+| `ALLOW_LOCAL_LAUNCH` | `false` | Permit local Chromium launch when no Browserless endpoint is provided. Requires Chrome deps.
+| `USER_AGENT` | desktop Chrome UA | Override reported user-agent string. |
+| `ACCEPT_LANGUAGE` | `en-US,en;q=0.9` | Override `Accept-Language` header. |
+| `TIMEZONE` | `America/Los_Angeles` | Timezone passed to `page.emulateTimezone`. |
+| `VIEWPORT_WIDTH` | `1280` | Page viewport width. |
+| `VIEWPORT_HEIGHT` | `720` | Page viewport height. |
+| `DEVICE_SCALE_FACTOR` | `1` | Device pixel ratio. |
+| `HEADLESS` | `'new'` | Set to `false` to open a visible browser (only valid with local launch). |
+| `CHROME_EXECUTABLE_PATH` | _(empty)_ | Custom Chrome binary path (local launch only). |
+| `USER_DATA_DIR` | _(empty)_ | Persistent Chrome profile directory (local launch only). |
 
 ## Development
 
@@ -39,11 +44,11 @@ Dependencies install during the Docker build. If you need them locally, run `npm
 To rebuild after code changes:
 
 ```sh
-docker compose up -d --build reader
+docker compose up -d --build text
 ```
 
 ## Notes
 
-- The service uses `puppeteer-extra` with the stealth plugin to reduce bot detection.
-- Output comes straight from Mozilla Readability; some sites may omit sidebars or interactive sections.
-- Handle the browser gracefully with `docker compose down` when you're done to free resources.
+- Uses `puppeteer-extra` + stealth plugin to reduce detection.
+- Mozilla Readability provides article text; structure-heavy pages may lose UI elements.
+- Shut down with `docker compose down` when finished.

@@ -1,12 +1,19 @@
 services:
-  reader:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  text:
+    build: .
     ports:
-      - "3000:3000"
+      - 3789:3000
     environment:
       - PORT=3000
-      - BROWSERLESS_WS_ENDPOINT=${BROWSERLESS_WS_ENDPOINT:-}
-      - BROWSERLESS_URL=${BROWSERLESS_URL:-}
-      - ALLOW_LOCAL_LAUNCH=${ALLOW_LOCAL_LAUNCH:-false}
+      - BROWSERLESS_WS_ENDPOINT=ws://10.10.10.10:4000
+      - BROWSERLESS_URL=
+      - ALLOW_LOCAL_LAUNCH=false
+      - USER_AGENT=
+      - ACCEPT_LANGUAGE=
+      - TIMEZONE=
+      - VIEWPORT_WIDTH=
+      - VIEWPORT_HEIGHT=
+      - DEVICE_SCALE_FACTOR=
+      - HEADLESS=
+      - CHROME_EXECUTABLE_PATH=
+      - USER_DATA_DIR=

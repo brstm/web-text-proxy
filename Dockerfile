@@ -1,15 +1,15 @@
-FROM node:20-slim
+FROM node:alpine
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
-WORKDIR /app
+WORKDIR /usr/src/app
 
 COPY package.json ./
 
 RUN npm install --omit=dev
 
-COPY web-text-proxy.js ./
+COPY web-text-proxy.js ./index.js
 
 EXPOSE 3000
 
-CMD ["npm", "run", "start"]
+CMD ["node", "index.js"]
