@@ -25,14 +25,6 @@ Set one of the Browserless endpoints before starting:
 
 When either is present the service connects remotely; local launch stays disabled in that profile.
 
-Example (domain-only shorthand):
-
-```sh
-BROWSERLESS_WS_ENDPOINT=ws://10.10.10.10:4000 docker compose --profile browserless up -d web-text-proxy-browserless
-```
-
-Passing the full URL (e.g. `/http://example.com/article`) also works if you need to override the default `https://`.
-
 > The Browserless profile ships without Chromium; if you omit the endpoint the service will fail fast instead of attempting a local launch.
 
 ## Environment Variables
