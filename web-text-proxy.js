@@ -1,4 +1,5 @@
 const express = require('express');
+const { promises: fs } = require('fs');
 const puppeteer = require('puppeteer-extra');
 const { Readability } = require('@mozilla/readability');
 const { JSDOM } = require('jsdom');
@@ -11,6 +12,9 @@ const BROWSERLESS_WS_ENDPOINT = process.env.BROWSERLESS_WS_ENDPOINT && process.e
 const BROWSERLESS_URL = process.env.BROWSERLESS_URL && process.env.BROWSERLESS_URL.trim();
 const USING_BROWSERLESS = Boolean(BROWSERLESS_WS_ENDPOINT || BROWSERLESS_URL);
 const SKIP_CHROMIUM_DOWNLOAD = process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD === 'true';
+const VERBOSE_LOG = process.env.VERBOSE_LOG === 'true';
+const ERROR_LOG_PATH = process.env.ERROR_LOG_PATH && process.env.ERROR_LOG_PATH.trim();
+const LOG_MESSAGE_LIMIT = Number(process.env.LOG_MESSAGE_LIMIT || 400);
 const USER_AGENT =
   process.env.USER_AGENT ||
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
@@ -23,6 +27,38 @@ const VIEWPORT = {
 };
 
 let browserPromise;
+
+function summarizeError(error) {
+  const name = error instanceof Error ? error.name : typeof error;
+  const message = error instanceof Error ? error.message : String(error);
+  const truncated =
+    message.length > LOG_MESSAGE_LIMIT ? `${message.slice(0, LOG_MESSAGE_LIMIT)}…` : message;
+  return { name, message, truncated, stack: error instanceof Error ? error.stack : undefined };
+}
+
+function recordError(error, context) {
+  const summary = summarizeError(error);
+  if (VERBOSE_LOG) {
+    console.error('Extraction failed:', { ...context, name: summary.name, message: summary.message, stack: summary.stack });
+  } else {
+    console.error(`Extraction failed: ${summary.name}: ${summary.truncated}`);
+  }
+
+  if (ERROR_LOG_PATH) {
+    const payload = {
+      timestamp: new Date().toISOString(),
+      ...context,
+      name: summary.name,
+      message: summary.message,
+      stack: summary.stack
+    };
+    fs.appendFile(ERROR_LOG_PATH, `${JSON.stringify(payload)}\n`).catch((writeError) => {
+      console.error('Failed to write error log:', writeError.message);
+    });
+  }
+
+  return summary.truncated;
+}
 
 async function getBrowser() {
   if (USING_BROWSERLESS) {
@@ -77,6 +113,10 @@ async function getBrowser() {
 }
 
 const app = express();
+
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain').send('User-agent: *\nAllow: /\n');
+});
 
 function resolveTargetUrl(req) {
   // Accept a raw URL at the path root, e.g. /https://example.com/article
@@ -159,11 +199,7 @@ app.get('*', async (req, res) => {
     if (page && !page.isClosed()) {
       await page.close();
     }
-    const message = error instanceof Error ? error.message : String(error);
-    console.error('Extraction failed:', {
-      name: error instanceof Error ? error.name : typeof error,
-      message
-    });
+    const message = recordError(error, { target });
     if (USING_BROWSERLESS && browser) {
       try {
         await browser.disconnect();
