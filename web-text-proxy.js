@@ -160,6 +160,15 @@ app.get('*', async (req, res) => {
     await page.setUserAgent(USER_AGENT);
     await page.setViewport(VIEWPORT);
     await page.setExtraHTTPHeaders({ 'Accept-Language': ACCEPT_LANGUAGE });
+    await page.setRequestInterception(true);
+    const blockedTypes = new Set(['image', 'media', 'font', 'other']);
+    page.on('request', (req) => {
+      if (blockedTypes.has(req.resourceType())) {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
     try {
       await page.emulateTimezone(TIMEZONE);
     } catch (timezoneError) {
@@ -169,7 +178,7 @@ app.get('*', async (req, res) => {
       Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
       Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
     });
-    await page.goto(target, { waitUntil: 'networkidle2', timeout: 45_000 });
+    await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     const html = await page.content();
     const virtualConsole = new VirtualConsole();
     const jsdomLogContext = (stage) => ({ stage, target });
