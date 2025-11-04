@@ -2,6 +2,9 @@ const express = require('express');
 const puppeteer = require('puppeteer-extra');
 const { Readability } = require('@mozilla/readability');
 const { JSDOM, VirtualConsole } = require('jsdom');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
 puppeteer.use(StealthPlugin());
@@ -22,6 +25,18 @@ const VIEWPORT = {
   height: Number(process.env.VIEWPORT_HEIGHT) || 720,
   deviceScaleFactor: Number(process.env.DEVICE_SCALE_FACTOR) || 1
 };
+
+const fsp = fs.promises;
+
+const rawCacheMinutes = Number(process.env.CACHE_TTL_MINUTES);
+const CACHE_TTL_MINUTES = Number.isFinite(rawCacheMinutes) && rawCacheMinutes > 0 ? rawCacheMinutes : 0;
+const CACHE_ENABLED = CACHE_TTL_MINUTES > 0;
+const CACHE_TTL_MS = CACHE_ENABLED ? CACHE_TTL_MINUTES * 60 * 1000 : 0;
+const CACHE_DIR = process.env.CACHE_DIR || path.join(__dirname, 'cache');
+
+if (CACHE_ENABLED && !fs.existsSync(CACHE_DIR)) {
+  fs.mkdirSync(CACHE_DIR, { recursive: true });
+}
 
 let browserPromise;
 
@@ -151,8 +166,29 @@ app.get('*', async (req, res) => {
     return;
   }
 
+  console.info(`[request] Received ${target}`);
+
   let page;
   let browser;
+  let cachePath;
+
+  if (CACHE_ENABLED) {
+    const cacheKey = crypto.createHash('sha1').update(target).digest('hex');
+    cachePath = path.join(CACHE_DIR, `${cacheKey}.txt`);
+    try {
+      const stat = await fsp.stat(cachePath);
+      if (Date.now() - stat.mtimeMs <= CACHE_TTL_MS) {
+        const cachedBody = await fsp.readFile(cachePath, 'utf8');
+        res.type('text/plain').send(cachedBody);
+        console.info(`[cache] HIT ${target}`);
+        console.info(`[complete] ${target} (cache hit, ${cachedBody.length} chars)`);
+        return;
+      }
+    } catch (cacheError) {
+      // cache miss or expired
+    }
+  }
+
   try {
     browser = await getBrowser();
     page = await browser.newPage();
@@ -180,6 +216,7 @@ app.get('*', async (req, res) => {
     });
     await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     const html = await page.content();
+    console.info(`[progress] DOM retrieved for ${target}`);
     const virtualConsole = new VirtualConsole();
     const jsdomLogContext = (stage) => ({ stage, target });
     virtualConsole.on('error', (err) => logError(err, jsdomLogContext('jsdom-error')));
@@ -197,6 +234,16 @@ app.get('*', async (req, res) => {
     const body = article.textContent.trim();
     if (!res.headersSent) {
       res.type('text/plain').send(body);
+    }
+    console.info(`[complete] ${target} (${body.length} chars)`);
+
+    if (CACHE_ENABLED && cachePath) {
+      try {
+        await fsp.writeFile(cachePath, body, 'utf8');
+        console.info(`[cache] STORED ${target}`);
+      } catch (cacheWriteError) {
+        logError(cacheWriteError, { stage: 'cache-write', target }, { log: VERBOSE_ERRORS });
+      }
     }
   } catch (error) {
     if (!res.headersSent) {

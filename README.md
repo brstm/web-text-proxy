@@ -44,6 +44,8 @@ When either is present the service connects remotely; local launch stays disable
 | `CHROME_EXECUTABLE_PATH` | _(empty)_ | Custom Chrome binary path (local launch only). |
 | `USER_DATA_DIR` | _(empty)_ | Persistent Chrome profile directory (local launch only). |
 | `VERBOSE_ERRORS` | `false` | When `true`, log full error objects instead of single-line messages. |
+| `CACHE_TTL_MINUTES` | `0` | Optional cache lifetime (minutes). `0` disables caching. |
+| `CACHE_DIR` | `./cache` | Directory for cached plaintext (used only when `CACHE_TTL_MINUTES > 0`). |
 
 ## Development
 
@@ -59,4 +61,6 @@ docker compose up -d --build
 
 - Uses `puppeteer-extra` + stealth plugin to reduce detection.
 - Mozilla Readability provides article text; structure-heavy pages may lose UI elements.
+- Requests automatically block images, media, fonts, and other non-text assets to keep Browserless/lightweight sessions fast.
+- When `CACHE_TTL_MINUTES` is set, responses are cached on disk and reused until the TTL expires; otherwise every request fetches fresh content.
 - Shut down with `docker compose down` when finished.
